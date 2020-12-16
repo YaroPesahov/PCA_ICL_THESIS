@@ -35,12 +35,7 @@ def velocities_upload(filename='flow_field_data0.pickle', comp=2):
           U = data[:, :, :, i]
         elif i==1:
           V = data[:, :, :, i]
-        #elif i==2:
-          #W = data[:, :, :, i]
     return U,V
-
-
-U,V = velocities_upload()
 
 
 def velocity_dash_2D(U,V):
@@ -53,9 +48,6 @@ def velocity_dash_2D(U,V):
     V_dash = (V-np.mean(V, axis=0)).reshape(V.shape[0], V.shape[1]*V.shape[2], order='F')
     Vel_dash = np.concatenate((U_dash, V_dash), axis=1)
     return Vel_dash
-
-
-Vel_dash = velocity_dash_2D(U,V)
 
 
 def eig(Vel_dash, points=250, cutoff=20):
@@ -80,10 +72,7 @@ def eig(Vel_dash, points=250, cutoff=20):
     return eigval, eigvec, Vel_dash_T
 
 
-eigval,eigvec,Vel_dash_T=eig(Vel_dash,points=100)
-
-
-def all_modes(eigval,eigvec,V=Vel_dash_T):
+def all_modes(eigval,eigvec,V):
        mod = np.dot(eigvec, np.diag(eigval.real**(-0.5)))
        modes = np.dot(V, mod)
        def rec_modes(modes=modes,V= V):
@@ -96,84 +85,56 @@ def all_modes(eigval,eigvec,V=Vel_dash_T):
        return modes, recreated_modes, a_coeff
 
 
-modes, recreated_modes, a_coeff = all_modes(eigval,eigvec)
-
 def grid (dy = 1 / 383,dx = 1 / 191):
     y, x = np.mgrid[slice(0, 1 + dy, dy), slice(0, 1 + dx, dx)]
-    return y,x
+    return y, x
 
 
-y,x=grid()
-
-def recreation_plot(recreated_modes=recreated_modes):
+def recreation_plot(recreated_modes):
     U = recreated_modes.sum(axis=1)
     U_POD = np.array(U[:int(len(U) / 2)])
     U_POD = U_POD.reshape(384, 192, order='F')
     return U_POD
 
-### PLotting section for Recreated flow
-U_full = recreation_plot()
+
+def mode_decomposition(n,modes):
+    Velocity = np.empty([384, 192, n])
+    for i in range(n):
+        Velocity[:, :, i] = np.array(modes[:, i][:int(len(modes[:, i]) / 2)]).reshape(384, 192, order='F')
+    return Velocity
+
+
+def level_norm(data):
+    level = MaxNLocator(nbins=100).tick_values(data.min(), data.max())
+    norm = BoundaryNorm(level, ncolors=cmap.N, clip=True)
+    return norm
+
+
+def plot(x, y, data, N, cmap, norm):
+    fig, ax = plt.subplots(1)
+    cf = ax.contourf(y, x, data, cmap=cmap, norm=norm)
+    fig.colorbar(cf, ax=ax)
+    mode= 'Mode ' + str(N)
+    ax.set_title(mode)
+    return ax
+
+
+U, V = velocities_upload()
+Vel_dash = velocity_dash_2D(U, V)
+eigval, eigvec, Vel_dash_T = eig(Vel_dash, points=100)
+modes, recreated_modes, a_coeff = all_modes(eigval, eigvec, Vel_dash_T)
+y, x = grid()
 cmap = plt.get_cmap('seismic')
-levels11 = MaxNLocator(nbins=20).tick_values(U_full.min(), U_full.max())
-norm11 = BoundaryNorm(levels11, ncolors=cmap.N, clip=True)
-fig11, ax11 = plt.subplots()
-cf11 = ax11.contourf(y, x, U_full, cmap=cmap, norm=norm11)
-fig11.colorbar(cf11, ax=ax11)
-ax11.set_title('Recreated Normalised Flow')
-plt.show()
-### End of the section
-
-#def plotting(number=3, modes=modes):
- #   for i in range(number):
-  #      Vel=modes[:,i]
-   #     U_POD = np.array(Vel[:int(len(Vel)/2)]).reshape(384,192, order='F')
-    #    cmap = plt.get_cmap('seismic')
-     #   fig, ax = plt.subplots(2, 2)
-      #  levels = MaxNLocator(nbins=100).tick_values(U_POD.min(), U_POD.max())
-       # norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
-       # cf0 = ax0.contourf(y, x, U_POD1, cmap=cmap, norm=norm)
-       # fig.colorbar(cf0, ax=ax0)
-       # ax0.set_title('Mode 1')
-     #return plt.show()
-
-
-Vel_dash1 = modes[:,0]
-Vel_dash2 = modes[:,1]
-Vel_dash3 = modes[:,2]
-# Create the necessary U vector arrays
-U_POD1 = np.array(Vel_dash1[:int(len(Vel_dash1)/2)]).reshape(384,192, order='F')
-U_POD2 = np.array(Vel_dash2[:int(len(Vel_dash2)/2)]).reshape(384,192, order='F')
-U_POD3 = np.array(Vel_dash3[:int(len(Vel_dash3)/2)]).reshape(384,192, order='F')
-U_100=U[100,:,:]
-
-""" Full Reconstruction of the flow using Three modes"""
-cmap = plt.get_cmap('seismic')
-#levels1 = MaxNLocator(nbins=20).tick_values(U_POD.min(), U_POD.max())
-levels1 = MaxNLocator(nbins=100).tick_values(U_POD1.min(), U_POD1.max())
-levels2 = MaxNLocator(nbins=100).tick_values(U_POD2.min(), U_POD2.max())
-levels3 = MaxNLocator(nbins=100).tick_values(U_POD3.min(), U_POD3.max())
-levels4 = MaxNLocator(nbins=100).tick_values(U_100.min(), U_100.max())
-
-#norm1 = BoundaryNorm(levels1, ncolors=cmap.N, clip=True)
-norm1 = BoundaryNorm(levels1, ncolors=cmap.N, clip=True)
-norm2 = BoundaryNorm(levels2, ncolors=cmap.N, clip=True)
-norm3 = BoundaryNorm(levels3, ncolors=cmap.N, clip=True)
-norm4 = BoundaryNorm(levels4, ncolors=cmap.N, clip=True)
-fig1, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2, 2)
-#fig1, ax0= plt.subplots()
-#cf0 = ax0.contourf(y, x, U_POD, cmap=cmap, norm=norm1)
-cf0 = ax0.contourf(y, x, U_POD1, cmap=cmap,norm=norm1)
-cf1 = ax1.contourf(y, x, U_POD2, cmap=cmap,norm=norm2)
-cf2 = ax2.contourf(y, x, U_POD3, cmap=cmap,norm=norm3)
-cf3 = ax3.contourf(y, x, U_100, cmap=cmap,norm=norm4)
-fig1.colorbar(cf0, ax=ax0)
-fig1.colorbar(cf1, ax=ax1)
-fig1.colorbar(cf2, ax=ax2)
-fig1.colorbar(cf3, ax=ax3)
-#fig1.colorbar(cf0, ax=ax0)
-ax0.set_title('Mode 1')
-ax1.set_title('Mode 2')
-ax2.set_title('Mode 3')
-ax3.set_title('Instantaneous Snapshot')
-
+U_full = recreation_plot(recreated_modes)
+level_full, norm_full = level_norm(U_full)
+Velocity = mode_decomposition(4, modes)
+norm1 = level_norm(Velocity[:, :, 0])
+norm2 = level_norm(Velocity[:, :, 1])
+norm3 = level_norm(Velocity[:, :, 2])
+norm4 = level_norm(Velocity[:, :, 3])
+ax0 = plot(x, y, U_full, 'Reconstructed', cmap, norm_full)
+ax = plot(x, y, Velocity[:, :, 0], 1, cmap,norm1)
+ax1 = plot(x, y, Velocity[:, :, 1], 2, cmap,norm2)
+ax2 = plot(x, y, Velocity[:, :, 2], 3, cmap,norm3)
+ax3 = plot(x, y, Velocity[:, :, 3], 4, cmap,norm4)
 plt.show()
